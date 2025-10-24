@@ -1,132 +1,193 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Quote } from './types';
-import QuoteForm from './components/QuoteForm';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { Quote, Currency, ShippingType } from './types';
 import QuoteList from './components/QuoteList';
+import QuoteForm from './components/QuoteForm';
 import { analyzeQuotes } from './services/geminiService';
 
-const SparklesIcon: React.FC<{ className?: string }> = ({ className }) => (
-    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09ZM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 0 0-2.456 2.456Z" />
-    </svg>
-);
-
-const currencyOptions = [
-  { code: 'EUR', name: 'Euro (€)' },
-  { code: 'USD', name: 'Dollar ($)' },
-  { code: 'FCFA', name: 'FCFA' },
-] as const;
-
-type Currency = typeof currencyOptions[number]['code'];
+const convertCurrency = (amount: number, from: Currency, to: Currency, rates: Record<string, number>): number => {
+    if (!rates || from === to) return amount;
+    const rateFrom = rates[from] || 1;
+    const rateTo = rates[to] || 1;
+    const amountInEur = amount / rateFrom;
+    return amountInEur * rateTo;
+};
 
 const App: React.FC = () => {
-  const [quotes, setQuotes] = useState<Quote[]>([]);
-  const [currency, setCurrency] = useState<Currency>('EUR');
-  const [analysis, setAnalysis] = useState<string>('');
-  const [isLoading, setIsLoading] = useState<boolean>(false);
+    const [quotes, setQuotes] = useState<Quote[]>(() => {
+        try {
+            const savedQuotesJSON = localStorage.getItem('quotes');
+            const savedQuotes = savedQuotesJSON ? JSON.parse(savedQuotesJSON) : [];
+            // Migration for older quotes that might not have a currency field
+            return savedQuotes.map((q: any) => ({ ...q, currency: q.currency || 'XOF' }));
+        } catch (error) {
+            console.error("Could not parse quotes from localStorage", error);
+            return [];
+        }
+    });
+    const [analysis, setAnalysis] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
+    const [quoteToEdit, setQuoteToEdit] = useState<Quote | null>(null);
 
-  useEffect(() => {
-    try {
-      const storedQuotes = localStorage.getItem('supplierQuotes');
-      if (storedQuotes) {
-        setQuotes(JSON.parse(storedQuotes));
-      }
-      const storedCurrency = localStorage.getItem('appCurrency');
-      if (storedCurrency && ['EUR', 'USD', 'FCFA'].includes(storedCurrency)) {
-          setCurrency(storedCurrency as Currency);
-      }
-    } catch (error) {
-      console.error("Failed to parse data from localStorage", error);
+    const [globalCurrency, setGlobalCurrency] = useState<Currency>('USD');
+    const [exchangeRates, setExchangeRates] = useState<Record<string, number> | null>(null);
+    const [exchangeRatesError, setExchangeRatesError] = useState<string | null>(null);
+
+    const formRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        localStorage.setItem('quotes', JSON.stringify(quotes));
+    }, [quotes]);
+
+    useEffect(() => {
+        const fetchRates = async () => {
+            setExchangeRatesError(null);
+            try {
+                const response = await fetch('https://api.exchangerate-api.com/v4/latest/EUR');
+                if (!response.ok) throw new Error('Échec de la récupération des taux de change depuis l\'API.');
+                const data = await response.json();
+                if (data && data.rates) {
+                    // XOF has a fixed rate to EUR, which might not be in the API response.
+                    data.rates['XOF'] = 655.957;
+                    setExchangeRates(data.rates);
+                } else {
+                    throw new Error('Format de données invalide depuis l\'API des taux de change.');
+                }
+            } catch (error) {
+                console.error("Could not fetch exchange rates:", error);
+                setExchangeRates(null);
+                const message = error instanceof Error ? error.message : "Une erreur inconnue est survenue.";
+                setExchangeRatesError(`Impossible de charger les taux de change. ${message} Les conversions sont désactivées.`);
+            }
+        };
+        fetchRates();
+    }, []);
+
+    const handleAddQuote = (newQuoteData: Omit<Quote, 'id'>) => {
+        const newQuote: Quote = { ...newQuoteData, id: Date.now().toString() + Math.random().toString(36).substring(2, 9) };
+        setQuotes(prev => [...prev, newQuote]);
+        setAnalysis('');
+    };
+
+    const handleUpdateQuote = (updatedQuote: Quote) => {
+        setQuotes(prev => prev.map(q => q.id === updatedQuote.id ? updatedQuote : q));
+        setQuoteToEdit(null);
+        setAnalysis('');
+    };
+
+    const handleEditQuote = (quote: Quote) => {
+        setQuoteToEdit(quote);
+        formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    };
+
+    const handleDeleteQuote = (id: string) => {
+        setQuotes(prev => prev.filter(quote => quote.id !== id));
+        setAnalysis('');
+    };
+
+    const deleteAllQuotes = () => {
+        setQuotes([]);
+        setAnalysis('');
     }
-  }, []);
 
-  useEffect(() => {
-    localStorage.setItem('supplierQuotes', JSON.stringify(quotes));
-  }, [quotes]);
+    const handleAnalyze = useCallback(async () => {
+        setIsLoading(true);
+        setAnalysis('');
+        if (!exchangeRates) {
+            setAnalysis("L'analyse est impossible car les taux de change n'ont pas pu être chargés.");
+            setIsLoading(false);
+            return;
+        }
 
-  useEffect(() => {
-    localStorage.setItem('appCurrency', currency);
-  }, [currency]);
+        try {
+            const quotesInGlobalCurrency = quotes.map(quote => {
+                const newQuote: Quote = JSON.parse(JSON.stringify(quote));
+                newQuote.unitPrice = convertCurrency(quote.unitPrice, quote.currency, globalCurrency, exchangeRates);
+                
+                for (const key of Object.keys(newQuote.shippingOptions) as (keyof Quote['shippingOptions'])[]) {
+                    const details = newQuote.shippingOptions[key];
+                    const originalDetails = quote.shippingOptions[key];
+                    if (details && originalDetails) {
+                        details.shippingCost = convertCurrency(originalDetails.shippingCost, quote.currency, globalCurrency, exchangeRates);
+                        details.deliveryCost = convertCurrency(originalDetails.deliveryCost, quote.currency, globalCurrency, exchangeRates);
+                    }
+                }
+                newQuote.currency = globalCurrency;
+                return newQuote;
+            });
 
-  const addQuote = (quote: Omit<Quote, 'id'>) => {
-    const newQuote: Quote = { ...quote, id: new Date().toISOString() };
-    setQuotes(prevQuotes => [newQuote, ...prevQuotes]);
-  };
+            const result = await analyzeQuotes(quotesInGlobalCurrency, globalCurrency);
+            setAnalysis(result);
+        } catch (error) {
+            console.error("Analysis failed", error);
+            setAnalysis("Une erreur est survenue lors de l'analyse.");
+        } finally {
+            setIsLoading(false);
+        }
+    }, [quotes, globalCurrency, exchangeRates]);
+    
+    const canAnalyze = quotes.length > 0 && !!exchangeRates;
 
-  const deleteQuote = (id: string) => {
-    setQuotes(prevQuotes => prevQuotes.filter(q => q.id !== id));
-  };
-  
-  const handleAnalysis = useCallback(async () => {
-    setIsLoading(true);
-    setAnalysis('');
-    const result = await analyzeQuotes(quotes, currency);
-    setAnalysis(result);
-    setIsLoading(false);
-  },[quotes, currency]);
+    return (
+        <div className="bg-slate-100 dark:bg-slate-900 min-h-screen text-slate-800 dark:text-slate-200 font-sans p-4 sm:p-6 lg:p-8">
+            <div className="max-w-4xl mx-auto space-y-8">
+                <header className="text-center">
+                    <h1 className="text-3xl sm:text-4xl font-bold text-slate-900 dark:text-white mb-2">Analyseur de Devis Fournisseurs</h1>
+                    <p className="text-slate-600 dark:text-slate-400">Comparez et analysez vos devis pour prendre la meilleure décision.</p>
+                </header>
 
-  return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-200 font-sans">
-      <main className="max-w-4xl mx-auto p-4 sm:p-6 lg:p-8">
-        <header className="text-center mb-10">
-          <h1 className="text-4xl sm:text-5xl font-extrabold text-slate-900 dark:text-white">
-            Gestionnaire de Devis
-          </h1>
-          <p className="mt-2 text-lg text-slate-600 dark:text-slate-400">
-            Votre outil pour centraliser et analyser les offres de vos fournisseurs.
-          </p>
-           <div className="mt-6 flex justify-center items-center gap-2 sm:gap-4">
-              {currencyOptions.map((opt) => (
-                <button
-                  key={opt.code}
-                  onClick={() => setCurrency(opt.code)}
-                  className={`px-4 py-2 text-sm font-semibold rounded-full transition-all duration-200 ease-in-out transform focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-50 dark:focus:ring-offset-slate-900 focus:ring-primary-500 ${
-                    currency === opt.code
-                      ? 'bg-primary-600 text-white shadow-lg scale-105'
-                      : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
-                  }`}
-                >
-                  {opt.name}
-                </button>
-              ))}
+                {exchangeRatesError && (
+                    <div className="bg-red-100 dark:bg-red-900/30 border border-red-400 dark:border-red-600 text-red-700 dark:text-red-300 px-4 py-3 rounded-lg relative" role="alert">
+                        <strong className="font-bold">Erreur :</strong>
+                        <span className="block sm:inline sm:ml-2">{exchangeRatesError}</span>
+                    </div>
+                )}
+                
+                <main className="space-y-8">
+                    <div ref={formRef}>
+                        <QuoteForm 
+                            onAddQuote={handleAddQuote}
+                            onUpdateQuote={handleUpdateQuote}
+                            quoteToEdit={quoteToEdit}
+                            clearEditing={() => setQuoteToEdit(null)}
+                            globalCurrency={globalCurrency}
+                            exchangeRates={exchangeRates}
+                        />
+                    </div>
+                    
+                    <div className="bg-white dark:bg-slate-800 p-4 rounded-lg shadow-md flex items-center justify-end gap-3">
+                        <label htmlFor="currency-select" className="text-sm font-medium text-slate-700 dark:text-slate-300">Devise d'affichage :</label>
+                        <select
+                            id="currency-select"
+                            value={globalCurrency}
+                            onChange={e => setGlobalCurrency(e.target.value as Currency)}
+                            className="rounded-md border-0 py-1.5 px-2 text-slate-900 dark:text-white bg-white dark:bg-slate-700 shadow-sm ring-1 ring-inset ring-slate-300 dark:ring-slate-600 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm"
+                        >
+                            <option value="USD">USD</option>
+                            <option value="EUR">EUR</option>
+                            <option value="XOF">XOF</option>
+                        </select>
+                    </div>
+
+                    <QuoteList 
+                        quotes={quotes}
+                        onRequestDeleteQuote={handleDeleteQuote}
+                        onAnalyze={handleAnalyze}
+                        analysis={analysis}
+                        isLoading={isLoading}
+                        canAnalyze={canAnalyze}
+                        deleteAllQuotes={deleteAllQuotes}
+                        onEditQuote={handleEditQuote}
+                        globalCurrency={globalCurrency}
+                        exchangeRates={exchangeRates}
+                    />
+                </main>
+                
+                <footer className="text-center text-sm text-slate-500 dark:text-slate-400 pt-4 border-t border-slate-200 dark:border-slate-700">
+                    <p>&copy; {new Date().getFullYear()} Analyseur de Devis. Construit avec React & Gemini.</p>
+                </footer>
             </div>
-        </header>
-
-        <div className="space-y-8">
-          <QuoteForm onAddQuote={addQuote} currency={currency} />
-          
-          <div className="space-y-4">
-             <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
-                 <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Liste des Devis</h2>
-                 <button 
-                    onClick={handleAnalysis} 
-                    disabled={isLoading || quotes.length === 0}
-                    className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:bg-slate-400 disabled:cursor-not-allowed transition-colors"
-                    >
-                    <SparklesIcon className="w-5 h-5"/>
-                    <span>{isLoading ? 'Analyse en cours...' : 'Analyser avec l\'IA'}</span>
-                </button>
-             </div>
-
-            {isLoading && (
-                <div className="flex justify-center items-center p-8 bg-white dark:bg-slate-800 rounded-lg shadow-md">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
-                    <p className="ml-4 text-slate-600 dark:text-slate-400">Gemini analyse vos données...</p>
-                </div>
-            )}
-
-            {analysis && (
-              <div className="p-6 bg-slate-100 dark:bg-slate-800 rounded-xl shadow-inner">
-                <h3 className="text-xl font-semibold mb-3 text-slate-900 dark:text-white">Résultat de l'Analyse IA</h3>
-                <div className="prose prose-slate dark:prose-invert max-w-none" dangerouslySetInnerHTML={{ __html: analysis.replace(/\n/g, '<br />') }} />
-              </div>
-            )}
-            
-            <QuoteList quotes={quotes} onDeleteQuote={deleteQuote} currency={currency} />
-          </div>
         </div>
-      </main>
-    </div>
-  );
+    );
 };
 
 export default App;

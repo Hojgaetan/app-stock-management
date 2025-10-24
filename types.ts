@@ -1,3 +1,10 @@
+export type Currency = 'EUR' | 'USD' | 'XOF';
+export type ShippingType = 'direct-air' | 'forwarder-standard' | 'forwarder-express';
+
+export interface ShippingCostDetail {
+  shippingCost: number;
+  deliveryCost: number;
+}
 
 export interface Quote {
   id: string;
@@ -6,6 +13,8 @@ export interface Quote {
   unitPrice: number;
   weightKg: number;
   quantity: number;
-  shippingCost: number;
-  deliveryCost: number;
+  shippingOptions: {
+    [key in ShippingType]?: ShippingCostDetail;
+  };
+  currency: Currency;
 }
