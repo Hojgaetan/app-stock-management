@@ -6,6 +6,12 @@ export interface ShippingCostDetail {
   deliveryCost: number;
 }
 
+export interface LocalTransportOption {
+  id: string;
+  name: string;
+  cost: number;
+}
+
 export interface Quote {
   id: string;
   supplierName: string;
@@ -17,4 +23,5 @@ export interface Quote {
     [key in ShippingType]?: ShippingCostDetail;
   };
   currency: Currency;
+  localTransportOptions: LocalTransportOption[];
 }

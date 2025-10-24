@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Quote, Currency, ShippingType } from './types';
+import { Quote, Currency, ShippingType, LocalTransportOption } from './types';
 import QuoteList from './components/QuoteList';
 import QuoteForm from './components/QuoteForm';
 import { analyzeQuotes } from './services/geminiService';
+import { initDB, getAllQuotes, addQuote, updateQuote, deleteQuote, clearQuotes } from './services/db';
 
 const convertCurrency = (amount: number, from: Currency, to: Currency, rates: Record<string, number>): number => {
     if (!rates || from === to) return amount;
@@ -13,20 +14,11 @@ const convertCurrency = (amount: number, from: Currency, to: Currency, rates: Re
 };
 
 const App: React.FC = () => {
-    const [quotes, setQuotes] = useState<Quote[]>(() => {
-        try {
-            const savedQuotesJSON = localStorage.getItem('quotes');
-            const savedQuotes = savedQuotesJSON ? JSON.parse(savedQuotesJSON) : [];
-            // Migration for older quotes that might not have a currency field
-            return savedQuotes.map((q: any) => ({ ...q, currency: q.currency || 'XOF' }));
-        } catch (error) {
-            console.error("Could not parse quotes from localStorage", error);
-            return [];
-        }
-    });
+    const [quotes, setQuotes] = useState<Quote[]>([]);
     const [analysis, setAnalysis] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [quoteToEdit, setQuoteToEdit] = useState<Quote | null>(null);
+    const [dbInitialized, setDbInitialized] = useState(false);
 
     const [globalCurrency, setGlobalCurrency] = useState<Currency>('USD');
     const [exchangeRates, setExchangeRates] = useState<Record<string, number> | null>(null);
@@ -35,8 +27,30 @@ const App: React.FC = () => {
     const formRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
-        localStorage.setItem('quotes', JSON.stringify(quotes));
-    }, [quotes]);
+        const initialize = async () => {
+            try {
+                await initDB();
+                setDbInitialized(true);
+            } catch (error) {
+                console.error("Failed to initialize DB", error);
+            }
+        };
+        initialize();
+    }, []);
+
+    useEffect(() => {
+        if (dbInitialized) {
+            const fetchQuotes = async () => {
+                try {
+                    const savedQuotes = await getAllQuotes();
+                    setQuotes(savedQuotes);
+                } catch(error) {
+                    console.error("Could not fetch quotes from DB", error);
+                }
+            };
+            fetchQuotes();
+        }
+    }, [dbInitialized]);
 
     useEffect(() => {
         const fetchRates = async () => {
@@ -62,13 +76,15 @@ const App: React.FC = () => {
         fetchRates();
     }, []);
 
-    const handleAddQuote = (newQuoteData: Omit<Quote, 'id'>) => {
+    const handleAddQuote = async (newQuoteData: Omit<Quote, 'id'>) => {
         const newQuote: Quote = { ...newQuoteData, id: Date.now().toString() + Math.random().toString(36).substring(2, 9) };
+        await addQuote(newQuote);
         setQuotes(prev => [...prev, newQuote]);
         setAnalysis('');
     };
 
-    const handleUpdateQuote = (updatedQuote: Quote) => {
+    const handleUpdateQuote = async (updatedQuote: Quote) => {
+        await updateQuote(updatedQuote);
         setQuotes(prev => prev.map(q => q.id === updatedQuote.id ? updatedQuote : q));
         setQuoteToEdit(null);
         setAnalysis('');
@@ -79,12 +95,14 @@ const App: React.FC = () => {
         formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     };
 
-    const handleDeleteQuote = (id: string) => {
+    const handleDeleteQuote = async (id: string) => {
+        await deleteQuote(id);
         setQuotes(prev => prev.filter(quote => quote.id !== id));
         setAnalysis('');
     };
 
-    const deleteAllQuotes = () => {
+    const deleteAllQuotes = async () => {
+        await clearQuotes();
         setQuotes([]);
         setAnalysis('');
     }
@@ -111,6 +129,12 @@ const App: React.FC = () => {
                         details.deliveryCost = convertCurrency(originalDetails.deliveryCost, quote.currency, globalCurrency, exchangeRates);
                     }
                 }
+
+                newQuote.localTransportOptions = newQuote.localTransportOptions.map((lt, index) => ({
+                    ...lt,
+                    cost: convertCurrency(quote.localTransportOptions[index].cost, quote.currency, globalCurrency, exchangeRates)
+                }));
+                
                 newQuote.currency = globalCurrency;
                 return newQuote;
             });

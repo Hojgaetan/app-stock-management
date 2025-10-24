@@ -1,4 +1,3 @@
-
 import { GoogleGenAI } from "@google/genai";
 import { Quote, ShippingType, ShippingCostDetail } from '../types';
 
@@ -35,18 +34,23 @@ export const analyzeQuotes = async (quotes: Quote[], currency: 'EUR' | 'USD' | '
       return {
         type: shippingTypeLabels[type as ShippingType] || type,
         coutLogistique: logisticsCost,
-        coutTotal: baseCost + logisticsCost,
-        coutParPiece: (baseCost + logisticsCost) / q.quantity,
+        coutTotalAvantTransportLocal: baseCost + logisticsCost,
+        coutParPieceAvantTransportLocal: (baseCost + logisticsCost) / q.quantity,
       };
     }).filter(Boolean);
+    
+    const localTransport = q.localTransportOptions.map(lt => ({
+        nom: lt.name,
+        cout: lt.cost,
+    }));
 
     return {
       fournisseur: q.supplierName,
       produit: q.productName,
       prixUnitaireProduit: q.unitPrice,
       quantite: q.quantity,
-      // FIX: Corrected shorthand property to a key-value pair. The variable is `shippingOptions`.
-      optionsExpedition: shippingOptions,
+      optionsExpeditionInternationale: shippingOptions,
+      optionsTransportLocal: localTransport,
     };
   });
 
@@ -56,11 +60,12 @@ export const analyzeQuotes = async (quotes: Quote[], currency: 'EUR' | 'USD' | '
     IMPORTANT : Tous les montants monétaires (prix, coûts) dans les données ci-dessous sont exprimés en ${currency}. Assure-toi que ton analyse reflète cette devise.
 
     L'analyse doit inclure :
-    1.  Un résumé global des options disponibles pour chaque produit/fournisseur.
-    2.  Pour chaque devis, identifie l'option d'expédition la plus rentable.
-    3.  Une comparaison globale pour identifier le devis et l'option d'expédition qui représentent le meilleur coût total le plus bas.
-    4.  Une recommandation sur le meilleur rapport qualité-prix, en tenant compte du coût total, du coût par pièce final, et de l'impact potentiel du délai de livraison (par exemple, "express" est plus rapide mais plus cher).
-    5.  Formate ta réponse en utilisant Markdown pour une meilleure lisibilité (titres, listes à puces, texte en gras).
+    1.  Un résumé global des options disponibles.
+    2.  Pour chaque devis, identifie l'option d'expédition internationale la plus rentable.
+    3.  Considère les options de transport local pour calculer le **coût final "tout compris"** (coût de base + expédition internationale + transport local).
+    4.  Une comparaison globale pour identifier le devis et la combinaison d'options (expédition + transport local) qui représentent le meilleur coût total le plus bas.
+    5.  Une recommandation sur le meilleur rapport qualité-prix, en tenant compte du coût par pièce final "tout compris", et de l'impact potentiel du délai de livraison.
+    6.  Formate ta réponse en utilisant Markdown pour une meilleure lisibilité (titres, listes à puces, texte en gras).
 
     Données des devis :
     ${JSON.stringify(formattedQuotes, null, 2)}

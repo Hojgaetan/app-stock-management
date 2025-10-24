@@ -21,7 +21,6 @@ const EditIcon: React.FC<{className?: string}> = ({className}) => (
   </svg>
 );
 
-
 const shippingTypeLabels: { [key in ShippingType]: string } = {
   'direct-air': 'Direct par avion',
   'forwarder-standard': 'Transitaire Standard',
@@ -29,9 +28,7 @@ const shippingTypeLabels: { [key in ShippingType]: string } = {
 };
 
 const convertCurrency = (amount: number, from: Currency, to: Currency, rates: Record<string, number>): number => {
-  if (!rates || from === to) {
-    return amount;
-  }
+  if (!rates || from === to) return amount;
   const rateFrom = rates[from] || 1;
   const rateTo = rates[to] || 1;
   const amountInEur = amount / rateFrom;
@@ -52,8 +49,9 @@ const QuoteCard: React.FC<QuoteCardProps> = ({ quote, onRequestDelete, onEdit, g
   
   const convertedUnitPrice = getConvertedValue(quote.unitPrice);
   const baseCost = convertedUnitPrice * quote.quantity;
-  
   const currencyToDisplay = exchangeRates ? globalCurrency : quote.currency;
+
+  const hasIntlShippingOptions = Object.values(quote.shippingOptions).some(v => v && (v.shippingCost > 0 || v.deliveryCost > 0));
 
   return (
     <div className="bg-white dark:bg-slate-800 rounded-lg shadow-md p-5 flex flex-col justify-between relative">
@@ -93,40 +91,71 @@ const QuoteCard: React.FC<QuoteCardProps> = ({ quote, onRequestDelete, onEdit, g
                 </div>
             </div>
 
-            <h4 className="text-md font-semibold mb-2 text-slate-800 dark:text-slate-200">Coûts de livraison</h4>
-            <ul className="space-y-2 text-sm">
+            <h4 className="text-md font-semibold mb-2 text-slate-800 dark:text-slate-200">Coûts de livraison internationale</h4>
+            <ul className="space-y-3 text-sm mb-4">
                 {Object.entries(quote.shippingOptions).map(([type, details]) => {
-                if (!details) return null;
+                if (!details || (details.shippingCost === 0 && details.deliveryCost === 0)) return null;
                 
                 const convertedShipping = getConvertedValue(details.shippingCost);
                 const convertedDelivery = getConvertedValue(details.deliveryCost);
                 const logisticsCost = convertedShipping + convertedDelivery;
-                const totalCost = baseCost + logisticsCost;
-
-                if (logisticsCost === 0) return null;
+                const totalCostBeforeLocal = baseCost + logisticsCost;
 
                 return (
-                    <li key={type} className="p-2 bg-slate-50 dark:bg-slate-700/50 rounded-md">
+                    <li key={type} className="p-3 bg-slate-50 dark:bg-slate-700/50 rounded-md">
                         <div className="font-medium text-slate-700 dark:text-slate-300">{shippingTypeLabels[type as ShippingType]}</div>
                         <div className="flex justify-between items-center mt-1 text-slate-600 dark:text-slate-400">
                             <span>Coût logistique:</span>
                             <span className="font-mono">{formatCurrency(logisticsCost, currencyToDisplay)}</span>
                         </div>
                         <div className="flex justify-between items-center font-semibold text-slate-800 dark:text-slate-200">
-                            <span>Coût total:</span>
-                            <span className="font-mono">{formatCurrency(totalCost, currencyToDisplay)}</span>
+                            <span>Coût total (avant transport local):</span>
+                            <span className="font-mono">{formatCurrency(totalCostBeforeLocal, currencyToDisplay)}</span>
                         </div>
-                         <div className="flex justify-between items-center text-xs text-slate-500 dark:text-slate-400 pt-1 border-t border-slate-200 dark:border-slate-600 mt-1">
-                            <span>Coût / pièce:</span>
-                            <span className="font-mono">{formatCurrency(totalCost / quote.quantity, currencyToDisplay)}</span>
-                        </div>
+                        {quote.localTransportOptions.length > 0 && (
+                            <div className="mt-2 pt-2 border-t border-slate-200 dark:border-slate-600">
+                                {quote.localTransportOptions.map(lt => {
+                                    const convertedLocalCost = getConvertedValue(lt.cost);
+                                    const finalCost = totalCostBeforeLocal + convertedLocalCost;
+                                    return (
+                                        <div key={lt.id} className="text-xs">
+                                            <div className="flex justify-between items-center text-slate-500 dark:text-slate-400">
+                                                <span>+ Coût final avec {lt.name}:</span>
+                                                <span className="font-mono">{formatCurrency(finalCost, currencyToDisplay)}</span>
+                                            </div>
+                                             <div className="flex justify-between items-center font-semibold text-blue-600 dark:text-blue-400">
+                                                <span>Coût / pièce (tout inclus):</span>
+                                                <span className="font-mono">{formatCurrency(finalCost / quote.quantity, currencyToDisplay)}</span>
+                                            </div>
+                                        </div>
+                                    )
+                                })}
+                            </div>
+                        )}
                     </li>
                 );
                 })}
-                 {Object.values(quote.shippingOptions).every(v => !v || (v.shippingCost === 0 && v.deliveryCost === 0)) && (
-                    <p className="text-sm text-slate-500 dark:text-slate-400 italic">Aucune option de livraison renseignée.</p>
+                {!hasIntlShippingOptions && (
+                    <p className="text-sm text-slate-500 dark:text-slate-400 italic">Aucune option de livraison internationale renseignée.</p>
                 )}
             </ul>
+            
+            {quote.localTransportOptions.length > 0 && !hasIntlShippingOptions && (
+                 <div>
+                    <h4 className="text-md font-semibold mb-2 text-slate-800 dark:text-slate-200">Coûts de transport local</h4>
+                     <ul className="space-y-2 text-sm">
+                        {quote.localTransportOptions.map(lt => {
+                             const convertedLocalCost = getConvertedValue(lt.cost);
+                             return (
+                                <li key={lt.id} className="p-2 bg-slate-50 dark:bg-slate-700/50 rounded-md flex justify-between items-center">
+                                    <span className="font-medium text-slate-700 dark:text-slate-300">{lt.name}</span>
+                                    <span className="font-mono text-slate-800 dark:text-slate-200">{formatCurrency(convertedLocalCost, currencyToDisplay)}</span>
+                                </li>
+                             )
+                        })}
+                    </ul>
+                 </div>
+            )}
         </div>
     </div>
   );
