@@ -1,5 +1,5 @@
 import { GoogleGenAI } from "@google/genai";
-import { Quote, ShippingType, ShippingCostDetail } from '../types';
+import { Quote, ShippingType } from '../types';
 
 const API_KEY = process.env.API_KEY;
 
@@ -7,7 +7,16 @@ if (!API_KEY) {
   console.warn("API_KEY is not set. Gemini API calls will fail.");
 }
 
-const ai = new GoogleGenAI({ apiKey: API_KEY! });
+// Lazy init: only create the client if API key is available
+let ai: GoogleGenAI | null = null;
+if (API_KEY) {
+  try {
+    ai = new GoogleGenAI({ apiKey: API_KEY });
+  } catch (e) {
+    console.warn("Failed to initialize GoogleGenAI client:", e);
+    ai = null;
+  }
+}
 
 const shippingTypeLabels: { [key in ShippingType]: string } = {
   'direct-air': 'Direct par avion de Chine à Dakar (délai estimé: 2 semaines)',
@@ -72,7 +81,11 @@ export const analyzeQuotes = async (quotes: Quote[], currency: 'EUR' | 'USD' | '
   `;
 
   try {
-    const response = await ai.models.generateContent({
+    // Ensure client exists at call time (in case of hot-reload)
+    if (!ai && API_KEY) {
+      ai = new GoogleGenAI({ apiKey: API_KEY });
+    }
+    const response = await ai!.models.generateContent({
       model: model,
       contents: prompt,
     });
