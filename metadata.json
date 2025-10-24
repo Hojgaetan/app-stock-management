@@ -1,0 +1,5 @@
+{
+  "name": "Gestionnaire de Devis Fournisseurs",
+  "description": "Une application web pour suivre et analyser les devis des fournisseurs, y compris les prix des articles, les frais d'expédition et les quantités. Intègre une analyse par IA pour optimiser les décisions commerciales.",
+  "requestFramePermissions": []
+}
