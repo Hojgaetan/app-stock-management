@@ -1,12 +1,34 @@
-
 import React, { useState } from 'react';
 import { Quote } from '../types';
 
+type Currency = 'EUR' | 'USD' | 'FCFA';
+
 interface QuoteFormProps {
   onAddQuote: (quote: Omit<Quote, 'id'>) => void;
+  currency: Currency;
 }
 
-const QuoteForm: React.FC<QuoteFormProps> = ({ onAddQuote }) => {
+const currencySymbols: { [key in Currency]: string } = {
+    EUR: '€',
+    USD: '$',
+    FCFA: 'FCFA',
+};
+
+const InputField: React.FC<{label: string, value: string, onChange: (e: React.ChangeEvent<HTMLInputElement>) => void, type?: string, placeholder?: string}> = 
+  ({label, value, onChange, type = 'text', placeholder}) => (
+    <div>
+      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">{label}</label>
+      <input
+        type={type}
+        value={value}
+        onChange={onChange}
+        placeholder={placeholder}
+        className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+      />
+    </div>
+  );
+
+const QuoteForm: React.FC<QuoteFormProps> = ({ onAddQuote, currency }) => {
   const [supplierName, setSupplierName] = useState('');
   const [productName, setProductName] = useState('');
   const [unitPrice, setUnitPrice] = useState('');
@@ -51,21 +73,6 @@ const QuoteForm: React.FC<QuoteFormProps> = ({ onAddQuote }) => {
     setError('');
   };
 
-  const InputField: React.FC<{label: string, value: string, onChange: (e: React.ChangeEvent<HTMLInputElement>) => void, type?: string, placeholder?: string}> = 
-  ({label, value, onChange, type = 'text', placeholder}) => (
-    <div>
-      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">{label}</label>
-      <input
-        type={type}
-        value={value}
-        onChange={onChange}
-        placeholder={placeholder}
-        className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
-      />
-    </div>
-  );
-
-
   return (
     <div className="bg-white dark:bg-slate-800 shadow-lg rounded-xl p-6 md:p-8">
       <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-6">Ajouter un nouveau devis</h2>
@@ -75,13 +82,13 @@ const QuoteForm: React.FC<QuoteFormProps> = ({ onAddQuote }) => {
           <InputField label="Nom du Produit" value={productName} onChange={(e) => setProductName(e.target.value)} placeholder="Ex: Coque de téléphone" />
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <InputField label="Prix Unitaire (€)" value={unitPrice} onChange={(e) => setUnitPrice(e.target.value)} type="number" placeholder="Ex: 5.50" />
+          <InputField label={`Prix Unitaire (${currencySymbols[currency]})`} value={unitPrice} onChange={(e) => setUnitPrice(e.target.value)} type="number" placeholder="Ex: 5.50" />
           <InputField label="Poids (kg)" value={weightKg} onChange={(e) => setWeightKg(e.target.value)} type="number" placeholder="Ex: 0.1" />
           <InputField label="Quantité" value={quantity} onChange={(e) => setQuantity(e.target.value)} type="number" placeholder="Ex: 1000" />
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <InputField label="Frais d'Expédition (€)" value={shippingCost} onChange={(e) => setShippingCost(e.target.value)} type="number" placeholder="Ex: 200" />
-          <InputField label="Frais de Livraison (€)" value={deliveryCost} onChange={(e) => setDeliveryCost(e.target.value)} type="number" placeholder="Ex: 50" />
+          <InputField label={`Frais d'Expédition (${currencySymbols[currency]})`} value={shippingCost} onChange={(e) => setShippingCost(e.target.value)} type="number" placeholder="Ex: 200" />
+          <InputField label={`Frais de Livraison (${currencySymbols[currency]})`} value={deliveryCost} onChange={(e) => setDeliveryCost(e.target.value)} type="number" placeholder="Ex: 50" />
         </div>
         {error && <p className="text-red-500 text-sm">{error}</p>}
         <div className="pt-2">

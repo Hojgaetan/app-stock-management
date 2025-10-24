@@ -1,10 +1,12 @@
-
 import React from 'react';
 import { Quote } from '../types';
+
+type Currency = 'EUR' | 'USD' | 'FCFA';
 
 interface QuoteCardProps {
   quote: Quote;
   onDelete: (id: string) => void;
+  currency: Currency;
 }
 
 const TrashIcon: React.FC<{ className?: string }> = ({ className }) => (
@@ -14,13 +16,13 @@ const TrashIcon: React.FC<{ className?: string }> = ({ className }) => (
 );
 
 
-const QuoteCard: React.FC<QuoteCardProps> = ({ quote, onDelete }) => {
+const QuoteCard: React.FC<QuoteCardProps> = ({ quote, onDelete, currency }) => {
   const totalCost = (quote.unitPrice * quote.quantity) + quote.shippingCost + quote.deliveryCost;
   const costPerItem = totalCost / quote.quantity;
   const totalWeight = quote.weightKg * quote.quantity;
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(amount);
+    return new Intl.NumberFormat('fr-FR', { style: 'currency', currency }).format(amount);
   };
 
   return (

@@ -1,14 +1,16 @@
-
 import React from 'react';
 import { Quote } from '../types';
 import QuoteCard from './QuoteCard';
 
+type Currency = 'EUR' | 'USD' | 'FCFA';
+
 interface QuoteListProps {
   quotes: Quote[];
   onDeleteQuote: (id: string) => void;
+  currency: Currency;
 }
 
-const QuoteList: React.FC<QuoteListProps> = ({ quotes, onDeleteQuote }) => {
+const QuoteList: React.FC<QuoteListProps> = ({ quotes, onDeleteQuote, currency }) => {
   if (quotes.length === 0) {
     return (
       <div className="text-center py-12 px-6 bg-white dark:bg-slate-800 rounded-lg shadow-md">
@@ -24,7 +26,7 @@ const QuoteList: React.FC<QuoteListProps> = ({ quotes, onDeleteQuote }) => {
   return (
     <div className="space-y-4">
       {quotes.map((quote) => (
-        <QuoteCard key={quote.id} quote={quote} onDelete={onDeleteQuote} />
+        <QuoteCard key={quote.id} quote={quote} onDelete={onDeleteQuote} currency={currency} />
       ))}
     </div>
   );

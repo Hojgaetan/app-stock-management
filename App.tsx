@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { Quote } from './types';
 import QuoteForm from './components/QuoteForm';
@@ -11,8 +10,17 @@ const SparklesIcon: React.FC<{ className?: string }> = ({ className }) => (
     </svg>
 );
 
+const currencyOptions = [
+  { code: 'EUR', name: 'Euro (€)' },
+  { code: 'USD', name: 'Dollar ($)' },
+  { code: 'FCFA', name: 'FCFA' },
+] as const;
+
+type Currency = typeof currencyOptions[number]['code'];
+
 const App: React.FC = () => {
   const [quotes, setQuotes] = useState<Quote[]>([]);
+  const [currency, setCurrency] = useState<Currency>('EUR');
   const [analysis, setAnalysis] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
@@ -22,14 +30,22 @@ const App: React.FC = () => {
       if (storedQuotes) {
         setQuotes(JSON.parse(storedQuotes));
       }
+      const storedCurrency = localStorage.getItem('appCurrency');
+      if (storedCurrency && ['EUR', 'USD', 'FCFA'].includes(storedCurrency)) {
+          setCurrency(storedCurrency as Currency);
+      }
     } catch (error) {
-      console.error("Failed to parse quotes from localStorage", error);
+      console.error("Failed to parse data from localStorage", error);
     }
   }, []);
 
   useEffect(() => {
     localStorage.setItem('supplierQuotes', JSON.stringify(quotes));
   }, [quotes]);
+
+  useEffect(() => {
+    localStorage.setItem('appCurrency', currency);
+  }, [currency]);
 
   const addQuote = (quote: Omit<Quote, 'id'>) => {
     const newQuote: Quote = { ...quote, id: new Date().toISOString() };
@@ -43,10 +59,10 @@ const App: React.FC = () => {
   const handleAnalysis = useCallback(async () => {
     setIsLoading(true);
     setAnalysis('');
-    const result = await analyzeQuotes(quotes);
+    const result = await analyzeQuotes(quotes, currency);
     setAnalysis(result);
     setIsLoading(false);
-  },[quotes]);
+  },[quotes, currency]);
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-200 font-sans">
@@ -58,10 +74,25 @@ const App: React.FC = () => {
           <p className="mt-2 text-lg text-slate-600 dark:text-slate-400">
             Votre outil pour centraliser et analyser les offres de vos fournisseurs.
           </p>
+           <div className="mt-6 flex justify-center items-center gap-2 sm:gap-4">
+              {currencyOptions.map((opt) => (
+                <button
+                  key={opt.code}
+                  onClick={() => setCurrency(opt.code)}
+                  className={`px-4 py-2 text-sm font-semibold rounded-full transition-all duration-200 ease-in-out transform focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-50 dark:focus:ring-offset-slate-900 focus:ring-primary-500 ${
+                    currency === opt.code
+                      ? 'bg-primary-600 text-white shadow-lg scale-105'
+                      : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
+                  }`}
+                >
+                  {opt.name}
+                </button>
+              ))}
+            </div>
         </header>
 
         <div className="space-y-8">
-          <QuoteForm onAddQuote={addQuote} />
+          <QuoteForm onAddQuote={addQuote} currency={currency} />
           
           <div className="space-y-4">
              <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
@@ -90,7 +121,7 @@ const App: React.FC = () => {
               </div>
             )}
             
-            <QuoteList quotes={quotes} onDeleteQuote={deleteQuote} />
+            <QuoteList quotes={quotes} onDeleteQuote={deleteQuote} currency={currency} />
           </div>
         </div>
       </main>

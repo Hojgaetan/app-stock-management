@@ -1,4 +1,3 @@
-
 import { GoogleGenAI } from "@google/genai";
 import { Quote } from '../types';
 
@@ -12,7 +11,7 @@ if (!API_KEY) {
 
 const ai = new GoogleGenAI({ apiKey: API_KEY! });
 
-export const analyzeQuotes = async (quotes: Quote[]): Promise<string> => {
+export const analyzeQuotes = async (quotes: Quote[], currency: 'EUR' | 'USD' | 'FCFA'): Promise<string> => {
   if (!API_KEY) {
     return "Erreur : La clé API Gemini n'est pas configurée. L'analyse ne peut pas être effectuée.";
   }
@@ -37,11 +36,12 @@ export const analyzeQuotes = async (quotes: Quote[]): Promise<string> => {
   const prompt = `
     En tant qu'expert en analyse commerciale et en chaîne d'approvisionnement, analyse les données de devis suivantes provenant de fournisseurs chinois. 
     Fournis une analyse concise et exploitable en français pour m'aider à prendre une décision.
+    IMPORTANT : Tous les montants monétaires (prix, coûts) dans les données ci-dessous sont exprimés en ${currency}. Assure-toi que ton analyse reflète cette devise.
 
     L'analyse doit inclure :
     1.  Un résumé global des options disponibles.
-    2.  Identification du devis le plus rentable au total.
-    3.  Identification du devis le plus cher au total.
+    2.  Identification du devis le plus rentable au total (en ${currency}).
+    3.  Identification du devis le plus cher au total (en ${currency}).
     4.  Une recommandation sur le meilleur rapport qualité-prix, en tenant compte non seulement du coût total mais aussi de facteurs potentiels comme le coût par unité.
     5.  Formate ta réponse en utilisant Markdown pour une meilleure lisibilité (titres, listes à puces).
 
