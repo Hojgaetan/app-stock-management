@@ -38,6 +38,17 @@
       .animate-fade-in {
         animation: fade-in 0.3s ease-out forwards;
       }
+
+      /* Impression: n'afficher que la carte ciblée */
+      @media print {
+        body { background: white !important; }
+        body * { visibility: hidden !important; }
+        .print-target, .print-target * { visibility: visible !important; }
+        .print-target { position: absolute; left: 0; top: 0; width: 100%; }
+        .no-print { display: none !important; }
+        /* Supprimer marges/ombres superflues à l'impression */
+        .print-target .shadow-md, .print-target .shadow, .print-target .rounded-lg { box-shadow: none !important; }
+      }
     </style>
   </head>
   <body class="bg-primary dark:bg-secondary">

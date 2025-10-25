@@ -11,10 +11,16 @@ interface QuoteFormProps {
 }
 
 const initialShippingInputs = {
-  'direct-air': { shippingCost: '', deliveryCost: '' },
-  'forwarder-standard': { shippingCost: '', deliveryCost: '' },
-  'forwarder-express': { shippingCost: '', deliveryCost: '' },
+  'direct-air': { shippingCost: '', deliveryCost: '', pricePerKg: '' },
+  'forwarder-standard': { shippingCost: '', deliveryCost: '', pricePerKg: '' },
+  'forwarder-express': { shippingCost: '', deliveryCost: '', pricePerKg: '' },
 };
+
+const PRESET_LOCAL_TRANSPORTS: { key: string; label: string; costXOF: number }[] = [
+  { key: 'clando', label: 'Clando', costXOF: 150 },
+  { key: 'car-rapide', label: 'Car Rapide', costXOF: 100 },
+  { key: 'brt', label: 'BRT', costXOF: 500 },
+];
 
 const convertCurrency = (amount: number, from: Currency, to: Currency, rates: Record<string, number>): number => {
     if (!rates || from === to) return amount;
@@ -23,6 +29,8 @@ const convertCurrency = (amount: number, from: Currency, to: Currency, rates: Re
     const amountInEur = amount / rateFrom;
     return amountInEur * rateTo;
 };
+
+const formatCurrency = (amount: number, currency: Currency) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency, currencyDisplay: 'code' }).format(amount);
 
 const getFractionDigits = (currency: Currency) => currency === 'XOF' ? 0 : 2;
 
@@ -54,16 +62,18 @@ const QuoteForm: React.FC<QuoteFormProps> = ({ onAddQuote, onUpdateQuote, quoteT
       setQuantity(String(quoteToEdit.quantity));
       setCurrency(quoteToEdit.currency);
       
-      const newShippingInputs = { ...initialShippingInputs };
+      const newShippingInputs = { ...initialShippingInputs } as any;
       for (const key in quoteToEdit.shippingOptions) {
           const typedKey = key as ShippingType;
           const details = quoteToEdit.shippingOptions[typedKey];
           if(details) {
               const displayShipping = convertCurrency(details.shippingCost, quoteToEdit.currency, globalCurrency, exchangeRates);
               const displayDelivery = convertCurrency(details.deliveryCost, quoteToEdit.currency, globalCurrency, exchangeRates);
+              const displayPricePerKg = details.pricePerKg != null ? convertCurrency(details.pricePerKg, quoteToEdit.currency, globalCurrency, exchangeRates) : '';
               newShippingInputs[typedKey] = {
                 shippingCost: displayShipping.toFixed(fractionDigits),
-                deliveryCost: displayDelivery.toFixed(fractionDigits)
+                deliveryCost: displayDelivery.toFixed(fractionDigits),
+                pricePerKg: displayPricePerKg === '' ? '' : (displayPricePerKg as number).toFixed(fractionDigits)
             };
           }
       }
@@ -104,7 +114,8 @@ const QuoteForm: React.FC<QuoteFormProps> = ({ onAddQuote, onUpdateQuote, quoteT
     if (!allowDecimals) {
         regex = /^\d*$/;
     } else if (fractionDigits > 0) {
-        regex = new RegExp(`^\\d*\\.?\\d{0,${fractionDigits}}$`);
+        // Autoriser . ou , comme séparateur décimal
+        regex = new RegExp(`^\\d*([.,]\\d{0,${fractionDigits}})?$`);
     } else {
         regex = /^\d*$/;
     }
@@ -114,11 +125,11 @@ const QuoteForm: React.FC<QuoteFormProps> = ({ onAddQuote, onUpdateQuote, quoteT
     }
   };
 
-  const handleShippingChange = (type: ShippingType, field: 'shippingCost' | 'deliveryCost', value: string) => {
+  const handleShippingChange = (type: ShippingType, field: 'shippingCost' | 'deliveryCost' | 'pricePerKg', value: string) => {
     const currencyForFormatting = isEditing ? globalCurrency : currency;
     const fractionDigits = getFractionDigits(currencyForFormatting);
-    const regex = new RegExp(`^\\d*\\.?\\d{0,${fractionDigits}}$`);
-    
+    const regex = new RegExp(`^\\d*([.,]\\d{0,${fractionDigits}})?$`);
+
     if (regex.test(value)) {
       setShippingInputs(prev => ({
         ...prev,
@@ -127,14 +138,23 @@ const QuoteForm: React.FC<QuoteFormProps> = ({ onAddQuote, onUpdateQuote, quoteT
     }
   };
 
-  const handleAddLocalOption = () => {
-      setLocalTransportOptions([...localTransportOptions, {id: Date.now().toString(), name: '', cost: 0}]);
-  }
-
   const handleRemoveLocalOption = (id: string) => {
       setLocalTransportOptions(localTransportOptions.filter(opt => opt.id !== id));
   }
   
+  // Ajouts rapides: presets en XOF (uniquement en mode ajout)
+  const addPresetLocalTransport = (label: string, leg: 'Aller' | 'Retour', costXOF: number) => {
+    const name = `${label} (${leg})`;
+    setLocalTransportOptions(prev => ([...prev, { id: Date.now().toString() + Math.random().toString(36).slice(2), name, cost: costXOF }]));
+  };
+  const addPresetLocalTransportBoth = (label: string, costXOF: number) => {
+    setLocalTransportOptions(prev => ([
+      ...prev,
+      { id: Date.now().toString() + Math.random().toString(36).slice(2), name: `${label} (Aller)`, cost: costXOF },
+      { id: Date.now().toString() + Math.random().toString(36).slice(2), name: `${label} (Retour)`, cost: costXOF },
+    ]));
+  };
+
 // Fix: Refactored to use an explicit if/else to properly handle type checking for 'name' and 'cost' fields.
   const handleLocalOptionChange = (id: string, field: 'name' | 'cost', value: string | number) => {
     setLocalTransportOptions(localTransportOptions.map(opt => {
@@ -143,9 +163,9 @@ const QuoteForm: React.FC<QuoteFormProps> = ({ onAddQuote, onUpdateQuote, quoteT
                 // En mode ajout, la saisie du transport local est en XOF (0 décimale)
                 const currencyForFormatting: Currency = isEditing ? globalCurrency : 'XOF';
                 const fractionDigits = getFractionDigits(currencyForFormatting);
-                const regex = new RegExp(`^\\d*\\.?\\d{0,${fractionDigits}}$`);
+                const regex = new RegExp(`^\\d*([.,]\\d{0,${fractionDigits}})?$`);
                 if (regex.test(String(value))) {
-                    return { ...opt, cost: parseFloat(String(value)) || 0 };
+                    return { ...opt, cost: parseFloat(String(String(value).replace(',', '.'))) || 0 };
                 }
                 return opt;
             } else { // field must be 'name'
@@ -159,13 +179,18 @@ const QuoteForm: React.FC<QuoteFormProps> = ({ onAddQuote, onUpdateQuote, quoteT
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    const getNum = (val: string | number) => parseFloat(String(val)) || 0;
+    const getNum = (val: string | number) => {
+      const s = String(val).replace(',', '.');
+      const n = parseFloat(s);
+      return isNaN(n) ? 0 : n;
+    };
 
     const parsedShippingOptions = Object.entries(shippingInputs).reduce((acc, [key, value]) => {
         const shippingCost = getNum(value.shippingCost);
         const deliveryCost = getNum(value.deliveryCost);
-        if (shippingCost > 0 || deliveryCost > 0) {
-          acc[key as ShippingType] = { shippingCost, deliveryCost };
+        const pricePerKg = getNum((value as any).pricePerKg);
+        if (shippingCost > 0 || deliveryCost > 0 || pricePerKg > 0) {
+          acc[key as ShippingType] = { shippingCost, deliveryCost, ...(pricePerKg > 0 ? { pricePerKg } : {}) };
         }
         return acc;
     }, {} as { [key in ShippingType]?: ShippingCostDetail });
@@ -181,8 +206,9 @@ const QuoteForm: React.FC<QuoteFormProps> = ({ onAddQuote, onUpdateQuote, quoteT
             const details = originalShippingOptions[typedKey];
             if (details) {
                 originalShippingOptions[typedKey] = {
-                    shippingCost: convertCurrency(details.shippingCost, globalCurrency, quoteToEdit.currency, exchangeRates),
-                    deliveryCost: convertCurrency(details.deliveryCost, globalCurrency, quoteToEdit.currency, exchangeRates)
+                    shippingCost: convertCurrency(details.shippingCost || 0, globalCurrency, quoteToEdit.currency, exchangeRates),
+                    deliveryCost: convertCurrency(details.deliveryCost || 0, globalCurrency, quoteToEdit.currency, exchangeRates),
+                    ...(details.pricePerKg != null ? { pricePerKg: convertCurrency(details.pricePerKg, globalCurrency, quoteToEdit.currency, exchangeRates) } : {})
                 };
             }
         }
@@ -250,6 +276,7 @@ const QuoteForm: React.FC<QuoteFormProps> = ({ onAddQuote, onUpdateQuote, quoteT
   // En mode ajout: la section "transport local" est saisie en XOF
   const localInputCurrencyLabel: Currency = isEditing ? activeCurrency : 'XOF';
   const needsRatesForLocal = !isEditing && localTransportOptions.some(o => o.cost > 0) && currency !== 'XOF' && !exchangeRates;
+  const localTotal = localTransportOptions.reduce((sum, o) => sum + (o.cost || 0), 0);
 
   return (
     <div className="bg-white dark:bg-secondary p-6 rounded-lg shadow-md">
@@ -260,9 +287,9 @@ const QuoteForm: React.FC<QuoteFormProps> = ({ onAddQuote, onUpdateQuote, quoteT
           <input type="text" placeholder="Nom du produit" value={productName} onChange={e => setProductName(e.target.value)} required className={inputClasses}/>
         </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <input type="text" inputMode="decimal" placeholder="Prix Unitaire" value={unitPrice} onChange={e => handleNumericChange(setUnitPrice, e.target.value, activeCurrency, true)} required className={inputClasses}/>
+          <input type="text" inputMode={activeCurrency === 'XOF' ? 'numeric' : undefined} placeholder="Prix Unitaire" value={unitPrice} onChange={e => handleNumericChange(setUnitPrice, e.target.value, activeCurrency, true)} required className={inputClasses}/>
           <input type="text" inputMode="decimal" placeholder="Quantité" value={quantity} onChange={e => handleNumericChange(setQuantity, e.target.value, activeCurrency, false)} required className={inputClasses}/>
-          <input type="text" inputMode="decimal" placeholder="Poids (Kg)" value={weightKg} onChange={e => handleNumericChange(setWeightKg, e.target.value, activeCurrency, true)} required className={inputClasses}/>
+          <input type="text" inputMode="decimal" placeholder="Poids unitaire (Kg)" value={weightKg} onChange={e => handleNumericChange(setWeightKg, e.target.value, activeCurrency, true)} required className={inputClasses}/>
           <select value={currency} onChange={e => setCurrency(e.target.value as Currency)} className={selectClasses} disabled={isEditing}>
             <option value="USD">USD</option>
             <option value="EUR">EUR</option>
@@ -276,20 +303,34 @@ const QuoteForm: React.FC<QuoteFormProps> = ({ onAddQuote, onUpdateQuote, quoteT
             {Object.keys(shippingInputs).map(typeStr => {
               const type = typeStr as ShippingType;
               return (
-                <div key={type} className="grid grid-cols-1 sm:grid-cols-3 gap-x-4 gap-y-2 items-center">
+                <div key={type} className="grid grid-cols-1 sm:grid-cols-4 gap-x-4 gap-y-2 items-center">
                   <label className="text-sm font-medium text-secondary/70 dark:text-primary/70 sm:col-span-1">{shippingTypeLabels[type]}</label>
-                  <input type="text" inputMode="decimal" placeholder="Frais d'expédition" value={shippingInputs[type].shippingCost} onChange={e => handleShippingChange(type, 'shippingCost', e.target.value)} className={inputClasses}/>
+                  <input type="text" inputMode="decimal" placeholder="Frais d'expédition (forfait)" value={shippingInputs[type].shippingCost} onChange={e => handleShippingChange(type, 'shippingCost', e.target.value)} className={inputClasses}/>
+                  <input type="text" inputMode="decimal" placeholder={`Prix / Kg`} value={shippingInputs[type].pricePerKg} onChange={e => handleShippingChange(type, 'pricePerKg', e.target.value)} className={inputClasses}/>
                   <input type="text" inputMode="decimal" placeholder="Frais de livraison" value={shippingInputs[type].deliveryCost} onChange={e => handleShippingChange(type, 'deliveryCost', e.target.value)} className={inputClasses}/>
                 </div>
               )
             })}
+            <p className="text-xs text-secondary/60 dark:text-primary/70">Astuce: Si le transitaire facture strictement au kilo, remplissez le champ "Prix / Kg". Le coût logistique sera calculé automatiquement en fonction du poids total.</p>
           </div>
         </fieldset>
         
         <fieldset className="border border-secondary/20 dark:border-primary/20 rounded-lg p-4">
           <legend className="px-2 text-sm font-medium text-secondary dark:text-primary">Frais de transport local (saisie en {localInputCurrencyLabel})</legend>
           {!isEditing && (
-            <p className="mt-1 mb-2 text-xs text-secondary/60 dark:text-primary/70">Entrez les frais de transport local en XOF. Ils seront convertis automatiquement dans la devise du devis lors de l'ajout.</p>
+            <>
+              <p className="mt-1 mb-2 text-xs text-secondary/60 dark:text-primary/70">Entrez les frais de transport local en XOF. Ils seront convertis automatiquement dans la devise du devis lors de l'ajout.</p>
+              <div className="mb-3 grid grid-cols-1 sm:grid-cols-3 gap-2">
+                {PRESET_LOCAL_TRANSPORTS.map(preset => (
+                  <div key={preset.key} className="flex items-center gap-2">
+                    <span className="text-xs text-secondary/80 dark:text-primary/80 w-28">{preset.label} ({formatCurrency(preset.costXOF, 'XOF')})</span>
+                    <button type="button" onClick={() => addPresetLocalTransport(preset.label, 'Aller', preset.costXOF)} className="px-2 py-1 text-xs rounded-md bg-secondary/10 hover:bg-secondary/20 dark:bg-primary/10 dark:hover:bg-primary/20 text-secondary dark:text-primary">Aller</button>
+                    <button type="button" onClick={() => addPresetLocalTransport(preset.label, 'Retour', preset.costXOF)} className="px-2 py-1 text-xs rounded-md bg-secondary/10 hover:bg-secondary/20 dark:bg-primary/10 dark:hover:bg-primary/20 text-secondary dark:text-primary">Retour</button>
+                    <button type="button" onClick={() => addPresetLocalTransportBoth(preset.label, preset.costXOF)} className="px-2 py-1 text-xs rounded-md bg-brandBlue/10 hover:bg-brandBlue/20 dark:bg-brandSky/10 dark:hover:bg-brandSky/20 text-brandBlue dark:text-brandSky">A/R</button>
+                  </div>
+                ))}
+              </div>
+            </>
           )}
           {needsRatesForLocal && (
             <div className="mb-2 text-xs text-brandYellow bg-brandYellow/10 border border-brandYellow rounded px-2 py-1">Taux de change indisponibles: conversion XOF → {currency} impossible. Veuillez attendre le chargement des taux ou choisissez XOF comme devise.</div>
@@ -309,7 +350,7 @@ const QuoteForm: React.FC<QuoteFormProps> = ({ onAddQuote, onUpdateQuote, quoteT
                         inputMode="decimal" 
                         placeholder={`Coût en ${localInputCurrencyLabel}`}
                         value={opt.cost || ''}
-                        onChange={(e) => handleLocalOptionChange(opt.id, 'cost', e.target.value)} 
+                        onChange={(e) => handleLocalOptionChange(opt.id, 'cost', e.target.value)}
                         className={inputClasses} 
                       />
                        <button 
@@ -320,12 +361,12 @@ const QuoteForm: React.FC<QuoteFormProps> = ({ onAddQuote, onUpdateQuote, quoteT
                        </button>
                   </div>
               ))}
-              <button 
-                type="button" 
-                onClick={handleAddLocalOption} 
-                className={`${buttonClasses} text-white bg-brandBlue hover:bg-brandSky focus:ring-brandBlue`}>
-                  + Ajouter un transport local
-              </button>
+              <div className="flex items-center justify-end">
+                {/* Bouton d'ajout de transport local supprimé selon la demande */}
+                <div className="text-sm font-medium text-secondary dark:text-primary">
+                  Total transport local: <span className="font-mono">{formatCurrency(localTotal, localInputCurrencyLabel)}</span>
+                </div>
+              </div>
           </div>
         </fieldset>
 

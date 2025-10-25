@@ -37,14 +37,20 @@ export const analyzeQuotes = async (quotes: Quote[], currency: 'EUR' | 'USD' | '
   
   const formattedQuotes = quotes.map(q => {
     const baseCost = q.unitPrice * q.quantity;
+    const totalWeightKg = (q.weightKg || 0) * (q.quantity || 0);
     const shippingOptions = Object.entries(q.shippingOptions).map(([type, details]) => {
       if (!details) return null;
-      const logisticsCost = details.shippingCost + details.deliveryCost;
+      const variableCost = details.pricePerKg ? (details.pricePerKg * totalWeightKg) : 0;
+      const logisticsCost = (details.shippingCost || 0) + variableCost + (details.deliveryCost || 0);
       return {
         type: shippingTypeLabels[type as ShippingType] || type,
-        coutLogistique: logisticsCost,
+        prixParKg: details.pricePerKg || 0,
+        coutLogistiqueVariable: variableCost,
+        coutLogistiqueForfait: details.shippingCost || 0,
+        coutLivraison: details.deliveryCost || 0,
+        coutLogistiqueTotal: logisticsCost,
         coutTotalAvantTransportLocal: baseCost + logisticsCost,
-        coutParPieceAvantTransportLocal: (baseCost + logisticsCost) / q.quantity,
+        coutParPieceAvantTransportLocal: (baseCost + logisticsCost) / (q.quantity || 1),
       };
     }).filter(Boolean);
     
@@ -58,6 +64,8 @@ export const analyzeQuotes = async (quotes: Quote[], currency: 'EUR' | 'USD' | '
       produit: q.productName,
       prixUnitaireProduit: q.unitPrice,
       quantite: q.quantity,
+      poidsUnitaireKg: q.weightKg,
+      poidsTotalKg: totalWeightKg,
       optionsExpeditionInternationale: shippingOptions,
       optionsTransportLocal: localTransport,
     };
@@ -74,7 +82,9 @@ export const analyzeQuotes = async (quotes: Quote[], currency: 'EUR' | 'USD' | '
     3.  Considère les options de transport local pour calculer le **coût final "tout compris"** (coût de base + expédition internationale + transport local).
     4.  Une comparaison globale pour identifier le devis et la combinaison d'options (expédition + transport local) qui représentent le meilleur coût total le plus bas.
     5.  Une recommandation sur le meilleur rapport qualité-prix, en tenant compte du coût par pièce final "tout compris", et de l'impact potentiel du délai de livraison.
-    6.  Formate ta réponse en utilisant Markdown pour une meilleure lisibilité (titres, listes à puces, texte en gras).
+    6.  Pour chaque devis, mentionne clairement le **poids unitaire (Kg)** et le **poids total de la marchandise (Kg)**, utile lorsque les transitaires facturent au kilo.
+    7.  Si un tarif **prix/kg** est renseigné pour l'expédition internationale, tiens compte de ce coût variable (prix/kg × poids total) dans le calcul du coût logistique total.
+    8.  Formate ta réponse en utilisant Markdown pour une meilleure lisibilité (titres, listes à puces, texte en gras).
 
     Données des devis :
     ${JSON.stringify(formattedQuotes, null, 2)}

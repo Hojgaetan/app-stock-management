@@ -135,6 +135,9 @@ const App: React.FC = () => {
                     if (details && originalDetails) {
                         details.shippingCost = convertCurrency(originalDetails.shippingCost, quote.currency, globalCurrency, exchangeRates);
                         details.deliveryCost = convertCurrency(originalDetails.deliveryCost, quote.currency, globalCurrency, exchangeRates);
+                        if (originalDetails.pricePerKg != null) {
+                            (details as any).pricePerKg = convertCurrency(originalDetails.pricePerKg, quote.currency, globalCurrency, exchangeRates);
+                        }
                     }
                 }
 

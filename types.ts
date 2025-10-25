@@ -4,6 +4,7 @@ export type ShippingType = 'direct-air' | 'forwarder-standard' | 'forwarder-expr
 export interface ShippingCostDetail {
   shippingCost: number;
   deliveryCost: number;
+  pricePerKg?: number; // nouveau: tarif au kilo (si le transitaire facture au kg)
 }
 
 export interface LocalTransportOption {
