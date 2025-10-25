@@ -54,11 +54,11 @@ const QuoteCard: React.FC<QuoteCardProps> = ({ quote, onRequestDelete, onEdit, g
   const hasIntlShippingOptions = Object.values(quote.shippingOptions).some(v => v && (v.shippingCost > 0 || v.deliveryCost > 0));
 
   return (
-    <div className="bg-white dark:bg-slate-800 rounded-lg shadow-md p-5 flex flex-col justify-between relative">
+    <div className="bg-white dark:bg-secondary rounded-lg shadow-md p-5 flex flex-col justify-between relative">
        <div className="absolute top-3 right-3 flex gap-2">
             <button 
                 onClick={() => onEdit(quote)}
-                className="text-slate-400 hover:text-blue-500 dark:hover:text-blue-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="text-secondary/40 dark:text-primary/50 hover:text-brandBlue dark:hover:text-brandSky transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 aria-label="Modifier le devis"
                 disabled={!exchangeRates}
             >
@@ -66,32 +66,32 @@ const QuoteCard: React.FC<QuoteCardProps> = ({ quote, onRequestDelete, onEdit, g
             </button>
             <button 
                 onClick={() => onRequestDelete(quote.id)}
-                className="text-slate-400 hover:text-red-500 dark:hover:text-red-400 transition-colors"
+                className="text-secondary/40 dark:text-primary/50 hover:text-brandRed transition-colors"
                 aria-label="Supprimer le devis"
             >
                 <TrashIcon className="w-5 h-5" />
             </button>
         </div>
         <div>
-            <h3 className="text-lg font-bold text-slate-900 dark:text-white truncate pr-16">{quote.supplierName}</h3>
-            <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">{quote.productName}</p>
+            <h3 className="text-lg font-bold text-secondary dark:text-primary truncate pr-16">{quote.supplierName}</h3>
+            <p className="text-sm text-secondary/70 dark:text-primary/70 mb-4">{quote.productName}</p>
 
-            <div className="grid grid-cols-3 gap-4 text-sm mb-4 border-b border-slate-200 dark:border-slate-700 pb-4">
+            <div className="grid grid-cols-3 gap-4 text-sm mb-4 border-b border-secondary/20 dark:border-primary/20 pb-4">
                 <div className="text-center">
-                    <p className="text-xs text-slate-500 dark:text-slate-400">Prix Unitaire</p>
+                    <p className="text-xs text-secondary/60 dark:text-primary/70">Prix Unitaire</p>
                     <p className="font-semibold">{formatCurrency(convertedUnitPrice, currencyToDisplay)}</p>
                 </div>
                 <div className="text-center">
-                    <p className="text-xs text-slate-500 dark:text-slate-400">Quantité</p>
+                    <p className="text-xs text-secondary/60 dark:text-primary/70">Quantité</p>
                     <p className="font-semibold">{quote.quantity.toLocaleString('fr-FR')}</p>
                 </div>
                 <div className="text-center">
-                    <p className="text-xs text-slate-500 dark:text-slate-400">Coût base</p>
+                    <p className="text-xs text-secondary/60 dark:text-primary/70">Coût base</p>
                     <p className="font-semibold">{formatCurrency(baseCost, currencyToDisplay)}</p>
                 </div>
             </div>
 
-            <h4 className="text-md font-semibold mb-2 text-slate-800 dark:text-slate-200">Coûts de livraison internationale</h4>
+            <h4 className="text-md font-semibold mb-2 text-secondary dark:text-primary">Coûts de livraison internationale</h4>
             <ul className="space-y-3 text-sm mb-4">
                 {Object.entries(quote.shippingOptions).map(([type, details]) => {
                 if (!details || (details.shippingCost === 0 && details.deliveryCost === 0)) return null;
@@ -102,28 +102,28 @@ const QuoteCard: React.FC<QuoteCardProps> = ({ quote, onRequestDelete, onEdit, g
                 const totalCostBeforeLocal = baseCost + logisticsCost;
 
                 return (
-                    <li key={type} className="p-3 bg-slate-50 dark:bg-slate-700/50 rounded-md">
-                        <div className="font-medium text-slate-700 dark:text-slate-300">{shippingTypeLabels[type as ShippingType]}</div>
-                        <div className="flex justify-between items-center mt-1 text-slate-600 dark:text-slate-400">
+                    <li key={type} className="p-3 bg-secondary/5 dark:bg-primary/10 rounded-md">
+                        <div className="font-medium text-secondary dark:text-primary">{shippingTypeLabels[type as ShippingType]}</div>
+                        <div className="flex justify-between items-center mt-1 text-secondary/70 dark:text-primary/70">
                             <span>Coût logistique:</span>
                             <span className="font-mono">{formatCurrency(logisticsCost, currencyToDisplay)}</span>
                         </div>
-                        <div className="flex justify-between items-center font-semibold text-slate-800 dark:text-slate-200">
+                        <div className="flex justify-between items-center font-semibold text-secondary dark:text-primary">
                             <span>Coût total (avant transport local):</span>
                             <span className="font-mono">{formatCurrency(totalCostBeforeLocal, currencyToDisplay)}</span>
                         </div>
                         {quote.localTransportOptions.length > 0 && (
-                            <div className="mt-2 pt-2 border-t border-slate-200 dark:border-slate-600">
+                            <div className="mt-2 pt-2 border-t border-secondary/20 dark:border-primary/20">
                                 {quote.localTransportOptions.map(lt => {
                                     const convertedLocalCost = getConvertedValue(lt.cost);
                                     const finalCost = totalCostBeforeLocal + convertedLocalCost;
                                     return (
                                         <div key={lt.id} className="text-xs">
-                                            <div className="flex justify-between items-center text-slate-500 dark:text-slate-400">
+                                            <div className="flex justify-between items-center text-secondary/70 dark:text-primary/70">
                                                 <span>+ Coût final avec {lt.name}:</span>
                                                 <span className="font-mono">{formatCurrency(finalCost, currencyToDisplay)}</span>
                                             </div>
-                                             <div className="flex justify-between items-center font-semibold text-blue-600 dark:text-blue-400">
+                                             <div className="flex justify-between items-center font-semibold text-brandBlue dark:text-brandSky">
                                                 <span>Coût / pièce (tout inclus):</span>
                                                 <span className="font-mono">{formatCurrency(finalCost / quote.quantity, currencyToDisplay)}</span>
                                             </div>
@@ -136,20 +136,20 @@ const QuoteCard: React.FC<QuoteCardProps> = ({ quote, onRequestDelete, onEdit, g
                 );
                 })}
                 {!hasIntlShippingOptions && (
-                    <p className="text-sm text-slate-500 dark:text-slate-400 italic">Aucune option de livraison internationale renseignée.</p>
+                    <p className="text-sm text-secondary/70 dark:text-primary/70 italic">Aucune option de livraison internationale renseignée.</p>
                 )}
             </ul>
             
             {quote.localTransportOptions.length > 0 && !hasIntlShippingOptions && (
                  <div>
-                    <h4 className="text-md font-semibold mb-2 text-slate-800 dark:text-slate-200">Coûts de transport local</h4>
+                    <h4 className="text-md font-semibold mb-2 text-secondary dark:text-primary">Coûts de transport local</h4>
                      <ul className="space-y-2 text-sm">
                         {quote.localTransportOptions.map(lt => {
                              const convertedLocalCost = getConvertedValue(lt.cost);
                              return (
-                                <li key={lt.id} className="p-2 bg-slate-50 dark:bg-slate-700/50 rounded-md flex justify-between items-center">
-                                    <span className="font-medium text-slate-700 dark:text-slate-300">{lt.name}</span>
-                                    <span className="font-mono text-slate-800 dark:text-slate-200">{formatCurrency(convertedLocalCost, currencyToDisplay)}</span>
+                                <li key={lt.id} className="p-2 bg-secondary/5 dark:bg-primary/10 rounded-md flex justify-between items-center">
+                                    <span className="font-medium text-secondary dark:text-primary">{lt.name}</span>
+                                    <span className="font-mono text-secondary dark:text-primary">{formatCurrency(convertedLocalCost, currencyToDisplay)}</span>
                                 </li>
                              )
                         })}

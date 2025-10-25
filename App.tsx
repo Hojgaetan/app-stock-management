@@ -4,6 +4,7 @@ import QuoteList from './components/QuoteList';
 import QuoteForm from './components/QuoteForm';
 import { analyzeQuotes } from './services/geminiService';
 import { initDB, getAllQuotes, addQuote, updateQuote, deleteQuote, clearQuotes } from './services/db';
+import StatusBanner from './components/StatusBanner';
 
 const convertCurrency = (amount: number, from: Currency, to: Currency, rates: Record<string, number>): number => {
     if (!rates || from === to) return amount;
@@ -23,6 +24,8 @@ const App: React.FC = () => {
     const [globalCurrency, setGlobalCurrency] = useState<Currency>('USD');
     const [exchangeRates, setExchangeRates] = useState<Record<string, number> | null>(null);
     const [exchangeRatesError, setExchangeRatesError] = useState<string | null>(null);
+
+    const [status, setStatus] = useState<{ type: 'success' | 'warning'; message: string } | null>(null);
 
     const formRef = useRef<HTMLDivElement>(null);
 
@@ -81,6 +84,7 @@ const App: React.FC = () => {
         await addQuote(newQuote);
         setQuotes(prev => [...prev, newQuote]);
         setAnalysis('');
+        setStatus({ type: 'success', message: 'Devis ajouté avec succès.' });
     };
 
     const handleUpdateQuote = async (updatedQuote: Quote) => {
@@ -88,6 +92,7 @@ const App: React.FC = () => {
         setQuotes(prev => prev.map(q => q.id === updatedQuote.id ? updatedQuote : q));
         setQuoteToEdit(null);
         setAnalysis('');
+        setStatus({ type: 'success', message: 'Devis mis à jour avec succès.' });
     };
 
     const handleEditQuote = (quote: Quote) => {
@@ -99,12 +104,14 @@ const App: React.FC = () => {
         await deleteQuote(id);
         setQuotes(prev => prev.filter(quote => quote.id !== id));
         setAnalysis('');
+        setStatus({ type: 'success', message: 'Devis supprimé avec succès.' });
     };
 
     const deleteAllQuotes = async () => {
         await clearQuotes();
         setQuotes([]);
         setAnalysis('');
+        setStatus({ type: 'success', message: 'Tous les devis ont été supprimés.' });
     }
 
     const handleAnalyze = useCallback(async () => {
@@ -112,6 +119,7 @@ const App: React.FC = () => {
         setAnalysis('');
         if (!exchangeRates) {
             setAnalysis("L'analyse est impossible car les taux de change n'ont pas pu être chargés.");
+            setStatus({ type: 'warning', message: "Analyse indisponible: taux de change non chargés." });
             setIsLoading(false);
             return;
         }
@@ -141,6 +149,7 @@ const App: React.FC = () => {
 
             const result = await analyzeQuotes(quotesInGlobalCurrency, globalCurrency);
             setAnalysis(result);
+            setStatus({ type: 'success', message: 'Analyse terminée.' });
         } catch (error) {
             console.error("Analysis failed", error);
             setAnalysis("Une erreur est survenue lors de l'analyse.");
@@ -152,20 +161,26 @@ const App: React.FC = () => {
     const canAnalyze = quotes.length > 0 && !!exchangeRates;
 
     return (
-        <div className="bg-slate-100 dark:bg-slate-900 min-h-screen text-slate-800 dark:text-slate-200 font-sans p-4 sm:p-6 lg:p-8">
-            <div className="max-w-4xl mx-auto space-y-8">
+        <div className="bg-primary dark:bg-secondary min-h-screen text-secondary dark:text-primary font-sans p-4 sm:p-6 lg:p-8">
+            <div className="max-w-4xl mx-auto space-y-4">
                 <header className="text-center">
-                    <h1 className="text-3xl sm:text-4xl font-bold text-slate-900 dark:text-white mb-2">Analyseur de Devis Fournisseurs</h1>
-                    <p className="text-slate-600 dark:text-slate-400">Comparez et analysez vos devis pour prendre la meilleure décision.</p>
+                    <h1 className="text-3xl sm:text-4xl font-bold text-secondary dark:text-primary mb-2">Analyseur de Devis Fournisseurs</h1>
+                    <p className="text-secondary/70 dark:text-primary/70">Comparez et analysez vos devis pour prendre la meilleure décision.</p>
                 </header>
 
                 {exchangeRatesError && (
-                    <div className="bg-red-100 dark:bg-red-900/30 border border-red-400 dark:border-red-600 text-red-700 dark:text-red-300 px-4 py-3 rounded-lg relative" role="alert">
+                    <div className="bg-brandRed/10 dark:bg-brandRed/20 border border-brandRed text-brandRed px-4 py-3 rounded-lg relative" role="alert">
                         <strong className="font-bold">Erreur :</strong>
                         <span className="block sm:inline sm:ml-2">{exchangeRatesError}</span>
                     </div>
                 )}
-                
+
+                {status && (
+                    <StatusBanner type={status.type} onClose={() => setStatus(null)}>
+                        {status.message}
+                    </StatusBanner>
+                )}
+
                 <main className="space-y-8">
                     <div ref={formRef}>
                         <QuoteForm 
@@ -178,13 +193,13 @@ const App: React.FC = () => {
                         />
                     </div>
                     
-                    <div className="bg-white dark:bg-slate-800 p-4 rounded-lg shadow-md flex items-center justify-end gap-3">
-                        <label htmlFor="currency-select" className="text-sm font-medium text-slate-700 dark:text-slate-300">Devise d'affichage :</label>
+                    <div className="bg-white dark:bg-secondary p-4 rounded-lg shadow-md flex items-center justify-end gap-3">
+                        <label htmlFor="currency-select" className="text-sm font-medium text-secondary dark:text-primary">Devise d'affichage :</label>
                         <select
                             id="currency-select"
                             value={globalCurrency}
                             onChange={e => setGlobalCurrency(e.target.value as Currency)}
-                            className="rounded-md border-0 py-1.5 px-2 text-slate-900 dark:text-white bg-white dark:bg-slate-700 shadow-sm ring-1 ring-inset ring-slate-300 dark:ring-slate-600 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm"
+                            className="rounded-md border-0 py-1.5 px-2 text-secondary dark:text-primary bg-white dark:bg-secondary shadow-sm ring-1 ring-inset ring-secondary/20 dark:ring-primary/20 focus:ring-2 focus:ring-inset focus:ring-brandBlue sm:text-sm"
                         >
                             <option value="USD">USD</option>
                             <option value="EUR">EUR</option>
@@ -206,8 +221,8 @@ const App: React.FC = () => {
                     />
                 </main>
                 
-                <footer className="text-center text-sm text-slate-500 dark:text-slate-400 pt-4 border-t border-slate-200 dark:border-slate-700">
-                    <p>&copy; {new Date().getFullYear()} Analyseur de Devis. Construit avec React & Gemini.</p>
+                <footer className="text-center text-sm text-secondary/60 dark:text-primary/70 pt-4 border-t border-secondary/20 dark:border-primary/20">
+                    <p>&copy; {new Date().getFullYear()} Analyseur de Devis. Créé par Joel Gaetan HASSAM OBAH.</p>
                 </footer>
             </div>
         </div>

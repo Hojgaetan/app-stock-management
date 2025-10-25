@@ -4,6 +4,7 @@ import QuoteCard from './QuoteCard';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import ConfirmationModal from './ConfirmationModal';
+import StatusBanner from './StatusBanner';
 
 interface QuoteListProps {
   quotes: Quote[];
@@ -20,9 +21,9 @@ interface QuoteListProps {
 
 const LoadingSpinner: React.FC = () => (
     <div className="flex items-center justify-center space-x-2">
-        <div className="w-4 h-4 rounded-full animate-pulse bg-blue-500"></div>
-        <div className="w-4 h-4 rounded-full animate-pulse bg-blue-500" style={{animationDelay: '0.2s'}}></div>
-        <div className="w-4 h-4 rounded-full animate-pulse bg-blue-500" style={{animationDelay: '0.4s'}}></div>
+        <div className="w-4 h-4 rounded-full animate-pulse bg-brandBlue"></div>
+        <div className="w-4 h-4 rounded-full animate-pulse bg-brandBlue" style={{animationDelay: '0.2s'}}></div>
+        <div className="w-4 h-4 rounded-full animate-pulse bg-brandBlue" style={{animationDelay: '0.4s'}}></div>
         <span className="ml-2">Analyse en cours...</span>
     </div>
 );
@@ -61,14 +62,14 @@ const QuoteList: React.FC<QuoteListProps> = ({
 
   return (
     <div className="space-y-6">
-      <div className="bg-white dark:bg-slate-800 p-6 rounded-lg shadow-md">
+      <div className="bg-white dark:bg-secondary p-6 rounded-lg shadow-md">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-            <h2 className="text-xl font-bold text-slate-900 dark:text-white">Devis Actuels ({quotes.length})</h2>
+            <h2 className="text-xl font-bold text-secondary dark:text-primary">Devis Actuels ({quotes.length})</h2>
             <div className="flex gap-2">
                 {quotes.length > 0 && (
                     <button 
                         onClick={() => setIsDeleteAllModalOpen(true)}
-                        className="px-4 py-2 text-sm font-medium rounded-md text-red-700 dark:text-red-400 bg-red-100 dark:bg-red-900/30 hover:bg-red-200 dark:hover:bg-red-900/50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 dark:focus:ring-offset-slate-800 transition-colors"
+                        className="px-4 py-2 text-sm font-medium rounded-md text-brandRed bg-brandRed/10 hover:bg-brandRed/20 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brandRed dark:focus:ring-offset-secondary transition-colors"
                     >
                         Tout supprimer
                     </button>
@@ -76,7 +77,7 @@ const QuoteList: React.FC<QuoteListProps> = ({
                 <button
                 onClick={onAnalyze}
                 disabled={!canAnalyze || isLoading}
-                className="px-4 py-2 text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 disabled:bg-slate-400 dark:disabled:bg-slate-600 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-offset-slate-800 transition-colors"
+                className="px-4 py-2 text-sm font-medium rounded-md text-white bg-brandBlue hover:bg-brandSky disabled:bg-secondary/40 dark:disabled:bg-secondary/60 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brandBlue dark:focus:ring-offset-secondary transition-colors"
                 >
                 {isLoading ? <LoadingSpinner /> : 'Lancer l\'Analyse'}
                 </button>
@@ -85,14 +86,14 @@ const QuoteList: React.FC<QuoteListProps> = ({
       </div>
 
       {isLoading && (
-         <div className="bg-white dark:bg-slate-800 p-6 rounded-lg shadow-md flex justify-center items-center">
+         <div className="bg-white dark:bg-secondary p-6 rounded-lg shadow-md flex justify-center items-center">
             <LoadingSpinner />
          </div>
       )}
 
       {analysis && !isLoading && (
-        <div className="bg-white dark:bg-slate-800 p-6 rounded-lg shadow-md prose prose-slate dark:prose-invert max-w-none">
-          <h3 className="text-lg font-bold mb-2">Résultats de l'analyse</h3>
+        <div className="bg-white dark:bg-secondary p-6 rounded-lg shadow-md prose prose-slate dark:prose-invert max-w-none">
+          <h3 className="text-lg font-bold mb-2 text-brandGreen">Résultats de l'analyse</h3>
           <ReactMarkdown remarkPlugins={[remarkGfm]}>{analysis}</ReactMarkdown>
         </div>
       )}
@@ -111,10 +112,11 @@ const QuoteList: React.FC<QuoteListProps> = ({
           ))}
         </div>
       ) : (
-        <div className="text-center py-12 bg-white dark:bg-slate-800 rounded-lg shadow-md">
-            <h3 className="text-lg font-semibold text-slate-700 dark:text-slate-300">Aucun devis pour le moment.</h3>
-            <p className="text-slate-500 dark:text-slate-400 mt-2">Ajoutez un devis en utilisant le formulaire.</p>
-        </div>
+        !isLoading && (
+          <StatusBanner type="warning" title="Aucun devis">
+            Ajoutez un devis en utilisant le formulaire ci-dessus.
+          </StatusBanner>
+        )
       )}
       <ConfirmationModal
         isOpen={isDeleteAllModalOpen}
